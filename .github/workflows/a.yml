@@ -14,7 +14,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Inspect file
+      - name: Inspect file (line-level debug)
         run: |
           echo "=== file ==="
           file geometry.json || true
@@ -22,21 +22,19 @@ jobs:
           echo "=== size ==="
           wc -c geometry.json || true
 
-          echo "=== head ==="
-          head -n 50 geometry.json || true
+          echo "=== line 1-50 ==="
+          nl -ba geometry.json | sed -n '1,60p' || true
 
-      - name: Guard: empty file check
+      - name: Extract problem line (28)
         run: |
-          if [ ! -s geometry.json ]; then
-            echo "ERROR: geometry.json is empty"
-            exit 1
-          fi
+          echo "=== line 28 ==="
+          sed -n '28p' geometry.json || true
 
-      - name: Normalize encoding (safe)
+      - name: Safe normalize encoding
         run: |
           python3 -c "p='geometry.json'; b=open(p,'rb').read(); t=b.decode('utf-8','ignore'); open(p,'w',encoding='utf-8').write(t)"
 
-      - name: Validate JSON (show error)
+      - name: Validate JSON (show full error)
         run: |
           python3 -m json.tool geometry.json
 
@@ -45,7 +43,7 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add geometry.json
-          git commit -m "fix: normalize geometry.json" || echo "no changes"
+          git commit -m "fix: geometry.json encoding cleanup" || echo "no changes"
 
       - name: Push to main
         run: |
