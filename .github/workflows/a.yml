@@ -11,30 +11,43 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: fix-geometry-encoding
 
-      - name: Show original file info
+      - name: Inspect file before fix
         run: |
           file geometry.json || true
           ls -la geometry.json || true
+          head -n 20 geometry.json || true
 
-      - name: Fix geometry.json encoding
+      - name: Fix encoding safely
         run: |
           set -e
-          iconv -f ISO-8859-1 -t UTF-8//TRANSLIT geometry.json -o geometry.json.tmp
-          mv geometry.json.tmp geometry.json
-          file geometry.json
 
-      - name: Verify JSON validity
+          # まずUTF-8として壊れていないか確認しつつ再保存
+          if iconv -f UTF-8 -t UTF-8 geometry.json -o geometry.tmp.json 2>/dev/null; then
+            mv geometry.tmp.json geometry.json
+          else
+            # フォールバック（不正文字を除去）
+            LC_ALL=C sed -i 's/[^[:print:]\t]//g' geometry.json
+          fi
+
+      - name: Validate JSON (verbose)
         run: |
-          python3 -m json.tool geometry.json > /dev/null && echo "JSON is valid"
+          python3 -m json.tool geometry.json
 
-      - name: Commit and push to feature branch
+      - name: Commit changes
         run: |
           git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+          git add geometry.json
+
+          git commit -m "fix: repair geometry.json encoding" || echo "No changes to commit"
+
+      - name: Push to main
+        run: |
+          git push origin main          git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add geometry.json
           git commit -m "fix: geometry.json encoding issue" || echo "No changes to commit"
