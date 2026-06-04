@@ -1,0 +1,46 @@
+name: Fix geometry.json Encoding
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix-encoding:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: fix-geometry-encoding
+
+      - name: Fix geometry.json encoding
+        run: |
+          # Convert geometry.json to UTF-8 encoding
+          file geometry.json
+          iconv -f ISO-8859-1 -t UTF-8 geometry.json > geometry.json.tmp
+          mv geometry.json.tmp geometry.json
+          file geometry.json
+
+      - name: Verify JSON validity
+        run: |
+          python3 -m json.tool geometry.json > /dev/null && echo "JSON is valid"
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add geometry.json
+          git commit -m "fix: geometry.jsonの文字化けを修正"
+          git push origin fix-geometry-encoding
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "fix: geometry.jsonの文字化けを修正"
+          title: "Fix: geometry.jsonの文字化けを修正"
+          body: |
+            This PR fixes the encoding issue in geometry.json
+            - Converts file to UTF-8 encoding
+            - Verifies JSON validity
+          branch: fix-geometry-encoding
+          delete-branch: true
