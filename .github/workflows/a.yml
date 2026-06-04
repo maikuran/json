@@ -49,4 +49,4 @@ jobs:
 
       - name: Push to main
         run: |
-          git push origin main        run: git push origin main
+          git push origin main
