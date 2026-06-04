@@ -2,21 +2,29 @@ name: Fix geometry.json Encoding
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
   fix-encoding:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           ref: fix-geometry-encoding
 
+      - name: Show original file info
+        run: |
+          file geometry.json || true
+          ls -la geometry.json || true
+
       - name: Fix geometry.json encoding
         run: |
-          # Convert geometry.json to UTF-8 encoding
-          file geometry.json
-          iconv -f ISO-8859-1 -t UTF-8 geometry.json > geometry.json.tmp
+          set -e
+          iconv -f ISO-8859-1 -t UTF-8//TRANSLIT geometry.json -o geometry.json.tmp
           mv geometry.json.tmp geometry.json
           file geometry.json
 
@@ -24,17 +32,21 @@ jobs:
         run: |
           python3 -m json.tool geometry.json > /dev/null && echo "JSON is valid"
 
-      - name: Commit and push changes
+      - name: Commit and push to feature branch
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add geometry.json
-          git commit -m "fix: geometry.jsonの文字化けを修正"
-          git push origin fix-geometry-encoding
+          git commit -m "fix: geometry.json encoding issue" || echo "No changes to commit"
+          git push origin fix-geometry-encoding || true
 
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
-        with:
+      - name: Push to main branch
+        run: |
+          git fetch origin main
+          git checkout main
+          git add geometry.json
+          git commit -m "fix: geometry.json encoding issue (main)" || echo "No changes to commit"
+          git push origin main        with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "fix: geometry.jsonの文字化けを修正"
           title: "Fix: geometry.jsonの文字化けを修正"
