@@ -14,24 +14,39 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Debug file
+      - name: Inspect file
         run: |
+          echo "=== file ==="
           file geometry.json || true
-          ls -la geometry.json || true
-          head -n 30 geometry.json || true
 
-      - name: Normalize encoding (Python inline, no EOF)
-        run: python3 -c "import io; p='geometry.json'; d=open(p,'rb').read().decode('utf-8','ignore'); open(p,'w',encoding='utf-8').write(d)"
+          echo "=== size ==="
+          wc -c geometry.json || true
 
-      - name: Validate JSON
-        run: python3 -m json.tool geometry.json
+          echo "=== head ==="
+          head -n 50 geometry.json || true
+
+      - name: Guard: empty file check
+        run: |
+          if [ ! -s geometry.json ]; then
+            echo "ERROR: geometry.json is empty"
+            exit 1
+          fi
+
+      - name: Normalize encoding (safe)
+        run: |
+          python3 -c "p='geometry.json'; b=open(p,'rb').read(); t=b.decode('utf-8','ignore'); open(p,'w',encoding='utf-8').write(t)"
+
+      - name: Validate JSON (show error)
+        run: |
+          python3 -m json.tool geometry.json
 
       - name: Commit changes
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add geometry.json
-          git commit -m "fix: normalize geometry.json encoding" || echo "no changes"
+          git commit -m "fix: normalize geometry.json" || echo "no changes"
 
       - name: Push to main
-        run: git push origin main
+        run: |
+          git push origin main        run: git push origin main
