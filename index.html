@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZpDIC API操作ツール 完全版</title>
+
+<style>
+body{
+    font-family:sans-serif;
+    margin:20px;
+    background:#f5f5f5;
+}
+input,textarea,select,button{
+    display:block;
+    width:100%;
+    max-width:700px;
+    padding:8px;
+    margin:8px 0;
+    box-sizing:border-box;
+}
+textarea{
+    min-height:80px;
+}
+button{
+    cursor:pointer;
+}
+pre{
+    background:#fff;
+    border:1px solid #ccc;
+    padding:10px;
+    overflow:auto;
+    max-width:1000px;
+    white-space:pre-wrap;
+}
+ul{
+    padding:0;
+}
+li{
+    list-style:none;
+    margin:4px 0;
+}
+.section{
+    background:#fff;
+    padding:15px;
+    margin-bottom:20px;
+    border-radius:8px;
+}
+</style>
+</head>
+<body>
+
+<h1>ZpDIC API操作ツール 完全版</h1>
+
+<div class="section">
+<h2>設定</h2>
+
+<label>APIキー</label>
+<input type="text" id="apiKey">
+
+<label>辞書ID</label>
+<input type="text" id="dictionaryId" placeholder="例: 1197">
+
+<button onclick="saveSettings()">設定保存</button>
+</div>
+
+<div class="section">
+<h2>単語追加</h2>
+
+<input id="wordName" placeholder="単語名">
+<input id="pronunciation" placeholder="発音">
+<input id="wordMeaning" placeholder="意味">
+<input id="variations" placeholder="バリエーション (|区切り)">
+<input id="tags" placeholder="タグ (|区切り)">
+
+<button onclick="addWord()">単語を追加</button>
+</div>
+
+<div class="section">
+<h2>単語取得</h2>
+
+<input id="wordNumber" placeholder="単語番号">
+<button onclick="getWord()">取得</button>
+
+<pre id="wordResult"></pre>
+</div>
+
+<div class="section">
+<h2>例文追加</h2>
+
+<textarea id="sentence" placeholder="例文"></textarea>
+<textarea id="translation" placeholder="翻訳"></textarea>
+
+<input id="exampleWordNumber" placeholder="単語番号">
+<input id="exampleTags" placeholder="タグ (|区切り)">
+<input id="exampleSupplement" placeholder="補足">
+
+<button onclick="addExample()">例文を追加</button>
+</div>
+
+<div class="section">
+<h2>一括単語追加</h2>
+
+<textarea id="bulkInput" placeholder="単語, 発音, 意味, バリエーション(|区切り), タグ(|区切り)"></textarea>
+
+<button onclick="bulkAddWords()">一括追加</button>
+
+<pre id="bulkStatus"></pre>
+</div>
+
+<div class="section">
+<h2>一括単語削除</h2>
+
+<textarea id="deleteWordNumbers" placeholder="10-20&#10;35&#10;40"></textarea>
+
+<button onclick="deleteWords()">削除</button>
+
+<pre id="deleteStatus"></pre>
+</div>
+
+<div class="section">
+<h2>TODOリスト</h2>
+
+<button onclick="loadTodo()">sihyou.txt読み込み</button>
+
+<ul id="todoList"></ul>
+</div>
+
+<div class="section">
+<h2>単語検索</h2>
+
+<input id="searchText" placeholder="検索文字列">
+
+<select id="searchMode">
+<option value="both">単語＋訳語</option>
+<option value="name">単語名</option>
+<option value="equivalent">訳語</option>
+<option value="tag">タグ</option>
+<option value="information">内容</option>
+<option value="variation">変化形</option>
+<option value="relation">関連語</option>
+<option value="content">全文</option>
+</select>
+
+<button onclick="searchWords()">検索</button>
+
+<pre id="searchResult"></pre>
+</div>
+
+<script>
+const apiBase = "https://zpdic.ziphil.com/api/v0";
+const todoStorageKey = "todoCheckedStatus";
+
+function saveSettings(){
+    localStorage.setItem("zpdic_api_key",document.getElementById("apiKey").value);
+    localStorage.setItem("zpdic_dictionary_id",document.getElementById("dictionaryId").value);
+    alert("保存しました");
+}
+
+function loadSettings(){
+    document.getElementById("apiKey").value=
+        localStorage.getItem("zpdic_api_key")||"";
+
+    document.getElementById("dictionaryId").value=
+        localStorage.getItem("zpdic_dictionary_id")||"";
+}
+
+function getHeaders(){
+    return{
+        "Content-Type":"application/json",
+        "X-Api-Key":document.getElementById("apiKey").value
+    };
+}
+
+async function addWord(){
+
+    const meaning=document.getElementById("wordMeaning").value;
+
+    const body={
+        word:{
+            name:document.getElementById("wordName").value,
+            pronunciation:document.getElementById("pronunciation").value,
+
+            equivalents:[
+                {
+                    titles:["日本語"],
+                    names:[meaning]
+                }
+            ],
+
+            tags:document.getElementById("tags").value
+                .split("|")
+                .filter(Boolean),
+
+            informations:[
+                {
+                    title:"意味",
+                    text:meaning
+                }
+            ],
+
+            variations:
+                document.getElementById("variations").value
+                .split("|")
+                .filter(Boolean)
+                .map(v=>({name:v})),
+
+            relations:[]
+        }
+    };
+
+    const res=await fetch(
+        `${apiBase}/dictionary/${document.getElementById("dictionaryId").value}/word`,
+        {
+            method:"POST",
+            headers:getHeaders(),
+            body:JSON.stringify(body)
+        }
+    );
+
+    alert(res.ok?"追加成功":"追加失敗");
+}
+
+async function getWord(){
+
+    const res=await fetch(
+        `${apiBase}/dictionary/${document.getElementById("dictionaryId").value}/word/${document.getElementById("wordNumber").value}`,
+        {
+            headers:getHeaders()
+        }
+    );
+
+    document.getElementById("wordResult").textContent=
+        await res.text();
+}
+
+async function addExample(){
+
+    const num=document.getElementById("exampleWordNumber").value;
+
+    const body={
+        example:{
+            sentence:document.getElementById("sentence").value,
+            translation:document.getElementById("translation").value,
+            supplement:document.getElementById("exampleSupplement").value,
+
+            tags:
+                document.getElementById("exampleTags").value
+                .split("|")
+                .filter(Boolean),
+
+            words:num?[{number:Number(num)}]:[],
+            offer:num?null:"today"
+        }
+    };
+
+    const res=await fetch(
+        `${apiBase}/dictionary/${document.getElementById("dictionaryId").value}/example`,
+        {
+            method:"POST",
+            headers:getHeaders(),
+            body:JSON.stringify(body)
+        }
+    );
+
+    alert(res.ok?"例文追加成功":"例文追加失敗");
+}
+
+async function bulkAddWords(){
+
+    const lines=
+        document.getElementById("bulkInput")
+        .value
+        .trim()
+        .split("\n");
+
+    let success=0;
+    let fail=0;
+
+    for(const line of lines){
+
+        const parts=line.split(",");
+
+        const name=(parts[0]||"").trim();
+        const pronunciation=(parts[1]||"").trim();
+        const meaning=(parts[2]||"").trim();
+        const variations=(parts[3]||"").trim();
+        const tags=(parts[4]||"").trim();
+
+        if(!name||!meaning){
+            continue;
+        }
+
+        const body={
+            word:{
+                name,
+                pronunciation,
+
+                equivalents:[
+                    {
+                        titles:["日本語"],
+                        names:[meaning]
+                    }
+                ],
+
+                tags:
+                    tags
+                    .split("|")
+                    .filter(Boolean),
+
+                informations:[
+                    {
+                        title:"意味",
+                        text:meaning
+                    }
+                ],
+
+                variations:
+                    variations
+                    .split("|")
+                    .filter(Boolean)
+                    .map(v=>({name:v})),
+
+                relations:[]
+            }
+        };
+
+        try{
+
+            const res=await fetch(
+                `${apiBase}/dictionary/${document.getElementById("dictionaryId").value}/word`,
+                {
+                    method:"POST",
+                    headers:getHeaders(),
+                    body:JSON.stringify(body)
+                }
+            );
+
+            if(res.ok){
+                success++;
+            }else{
+                fail++;
+            }
+
+            document.getElementById("bulkStatus").textContent=
+                `成功:${success} 失敗:${fail}`;
+
+        }catch{
+            fail++;
+        }
+    }
+
+    alert("完了");
+}
+
+async function deleteWords(){
+
+    let numbers=[];
+
+    document.getElementById("deleteWordNumbers")
+    .value
+    .trim()
+    .split("\n")
+    .forEach(line=>{
+
+        line=line.trim();
+
+        if(!line){
+            return;
+        }
+
+        if(line.includes("-")){
+
+            const [start,end]=line.split("-").map(Number);
+
+            for(let i=start;i<=end;i++){
+                numbers.push(i);
+            }
+
+        }else{
+
+            numbers.push(Number(line));
+        }
+    });
+
+    if(numbers.length<1||numbers.length>100){
+        alert("1～100件");
+        return;
+    }
+
+    let success=0;
+    let fail=0;
+
+    for(const num of numbers){
+
+        try{
+
+            const res=await fetch(
+                `${apiBase}/dictionary/${document.getElementById("dictionaryId").value}/word/${num}`,
+                {
+                    method:"DELETE",
+                    headers:getHeaders()
+                }
+            );
+
+            if(res.ok){
+                success++;
+            }else{
+                fail++;
+            }
+
+        }catch{
+            fail++;
+        }
+    }
+
+    document.getElementById("deleteStatus").textContent=
+        `成功:${success} 失敗:${fail}`;
+
+    alert("削除完了");
+}
+
+async function loadTodo(){
+
+    const res=await fetch("sihyou.txt");
+
+    if(!res.ok){
+        alert("読み込み失敗");
+        return;
+    }
+
+    const lines=
+        (await res.text())
+        .split("\n")
+        .map(v=>v.trim())
+        .filter(Boolean);
+
+    const saved=
+        JSON.parse(
+            localStorage.getItem(todoStorageKey)||"{}"
+        );
+
+    const list=document.getElementById("todoList");
+
+    list.innerHTML="";
+
+    lines.forEach(word=>{
+
+        const li=document.createElement("li");
+
+        const cb=document.createElement("input");
+
+        cb.type="checkbox";
+        cb.checked=!!saved[word];
+
+        const span=document.createElement("span");
+
+        span.textContent=word;
+
+        if(cb.checked){
+            span.style.textDecoration="line-through";
+            span.style.color="gray";
+        }
+
+        cb.onchange=()=>{
+
+            const status=
+                JSON.parse(
+                    localStorage.getItem(todoStorageKey)||"{}"
+                );
+
+            if(cb.checked){
+
+                status[word]=true;
+
+                span.style.textDecoration="line-through";
+                span.style.color="gray";
+
+            }else{
+
+                delete status[word];
+
+                span.style.textDecoration="none";
+                span.style.color="black";
+            }
+
+            localStorage.setItem(
+                todoStorageKey,
+                JSON.stringify(status)
+            );
+        };
+
+        li.appendChild(cb);
+        li.appendChild(span);
+
+        list.appendChild(li);
+    });
+}
+
+async function searchWords(){
+
+    const dictionaryId=
+        document.getElementById("dictionaryId").value.trim();
+
+    const text=
+        document.getElementById("searchText").value.trim();
+
+    const mode=
+        document.getElementById("searchMode").value;
+
+    if(!dictionaryId||!text){
+        alert("入力してください");
+        return;
+    }
+
+    const params=new URLSearchParams({
+        text,
+        mode,
+        type:"part",
+        ignoreCase:"true",
+        skip:"0",
+        limit:"100",
+        orderMode:"unicode",
+        orderDirection:"ascending"
+    });
+
+    const url=
+        `${apiBase}/dictionary/${encodeURIComponent(dictionaryId)}/words?${params}`;
+
+    const res=await fetch(url,{
+        headers:getHeaders()
+    });
+
+    if(!res.ok){
+        alert("検索失敗");
+        return;
+    }
+
+    const data=await res.json();
+
+    let output="";
+
+    const words=data.words||[];
+
+    for(const word of words){
+
+        output+=
+`#${word.number}
+単語: ${word.name}
+発音: ${word.pronunciation||""}
+
+`;
+
+        if(word.informations){
+
+            for(const info of word.informations){
+
+                output+=`${info.title}: ${info.text}\n`;
+            }
+        }
+
+        output+="\n--------------------\n\n";
+    }
+
+    document.getElementById("searchResult").textContent=
+        output||"見つかりません";
+}
+
+loadSettings();
+</script>
+
+</body>
+</html>
